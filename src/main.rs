@@ -1,10 +1,10 @@
 #![feature(stdin_forwarders)]
 
-// use std::convert::From;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde;
 use serde_yaml;
-use std::io::{self};
+use std::convert::From;
+use std::io;
 use toml;
 
 enum FMScanState {
@@ -13,8 +13,34 @@ enum FMScanState {
     // Complete,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct FrontMatter {
+/// Generic wrapper that allow one or more occurrences of specified type.
+///
+/// In YAML it will presented or as a value, or as an array:
+/// ```yaml
+/// one: just a string
+/// many:
+///   - 1st string
+///   - 2nd string
+/// ```
+#[derive(Clone, Debug, serde::Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    /// Single value
+    One(T),
+    /// Array of values
+    Vec(Vec<T>),
+}
+impl<T> From<OneOrMany<T>> for Vec<T> {
+    fn from(from: OneOrMany<T>) -> Self {
+        match from {
+            OneOrMany::One(val) => vec![val],
+            OneOrMany::Vec(vec) => vec,
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+struct HugoFM {
     title: String,
     date: String,
     description: String,
@@ -22,13 +48,13 @@ struct FrontMatter {
     tags: Vec<String>,
     draft: bool,
     slug: String,
-    aliases: Vec<String>,
+    aliases: OneOrMany<String>,
 }
 
 fn main() {
     let lines = io::stdin().lines();
 
-    let mut fm_serialized: Vec<String> = Vec::new();
+    let mut fm_se: Vec<String> = Vec::new();
     let mut fm_scan_state = FMScanState::Waiting;
     let yaml_tag_re = Regex::new(r"---\s*").unwrap();
 
@@ -47,24 +73,30 @@ fn main() {
             };
         }
 
-        fm_serialized.push(line);
+        fm_se.push(line);
     }
 
-    for fm_line in fm_serialized {
+    for fm_line in &fm_se {
         println!("{}", fm_line);
     }
 
-    let fm = FrontMatter {
-        title: "Cool Blog Post".into(),
-        date: "2022-01-10".into(),
-        description: "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.".into(),
-        draft: false,
-        slug: "cool-blog-post".into(),
-        aliases: vec!["/old-cool-blog-post-url/".into()],
-        category: "Category".into(),
-        tags: vec!["tag1".into(),"tag2".into(), "tag3".into()],
-    };
+    let fm_str = fm_se.join("\n");
 
-    println!("{}", toml::to_string(&fm).unwrap());
-    println!("{}", serde_yaml::to_string(&fm).unwrap());
+    let fm_de: HugoFM = serde_yaml::from_str(&fm_str).unwrap();
+
+    println!("{:?}", fm_de);
+
+    // let fm = HugoFM {
+    //     title: "Cool Blog Post".into(),
+    //     date: "2022-01-10".into(),
+    //     description: "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.".into(),
+    //     draft: false,
+    //     slug: "cool-blog-post".into(),
+    //     aliases: vec!["/old-cool-blog-post-url/".into()],
+    //     category: "Category".into(),
+    //     tags: vec!["tag1".into(),"tag2".into(), "tag3".into()],
+    // };
+
+    // println!("{}", toml::to_string(&fm).unwrap());
+    // println!("{}", serde_yaml::to_string(&fm).unwrap());
 }
