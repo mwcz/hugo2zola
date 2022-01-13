@@ -10,4 +10,5 @@ clap = "3.0.5"
 regex = "1"
 serde = { version = "1.0.133", features = ["derive"] }
 serde_yaml = "0.8"
+serde_with = "1.11.0"
 toml = "0.5"
